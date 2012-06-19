@@ -42,7 +42,8 @@
 }
 
 form.commerce-add-to-cart input {
-  margin: 0;
+  margin: 3px 0;
+
 }
 
 .view-commerce-cart-form .line-item-summary {

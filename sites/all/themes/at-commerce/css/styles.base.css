@@ -432,6 +432,7 @@ article .field {
 .field-type-taxonomy-term-reference ul {
   margin: 0;
   padding: 0;
+  
 }
 .field-type-taxonomy-term-reference li {
   list-style: none;
@@ -466,7 +467,7 @@ article ul.links {
   font-size: 0.923em;
   text-transform: capitalize;
   text-align: right;
-  margin: 10px 0;
+  margin: 10px;
   padding: 0;
 }
 article ul.links li {

@@ -3,28 +3,236 @@
 /**
  * Implementation of hook_menu().
  */
-function internet_devels_menu() {
-  $items = array();
-  $items['internet_devels_page'] = array(
-    'title'           => '', 
-    'page callback'   => 'internet_devels_page',
-    'type'            => MENU_CALLBACK,
-    'access callback' => TRUE,
+//function internet_devels_menu() {
+//  $items = array();
+//  $items['internet_devels_page'] = array(
+//    'title'           => '', 
+//    'page callback'   => 'internet_devels_page',
+//    'type'            => MENU_CALLBACK,
+//    'access callback' => TRUE,
+//  );
+//  return $items;
+//}
+//
+//function internet_devels_preprocess_page(&$vars) {
+//
+//  //if (isset($vars['node']->title) {
+//  //  $vars['node']->title = '';
+//  //}
+// $vars['breadcrumb'] = '';
+// 
+////drupal_set_message('<pre><strong>debug:</strong><br />' . print_r($vars, 1) . '</pre>', 'warning');
+//}
+
+//function internet_devels_page() {
+//  print ' ';
+//  return ' ';
+//}
+
+/**
+ * Implementation of hook_block_info().
+ */
+function internet_devels_block_info() {
+  $info['product_reports'] = array(
+    'info'  => t('Product reports'),
+    'cache' => DRUPAL_NO_CACHE,
   );
-  return $items;
+  $info['web_links'] = array(
+    'info'  => t('This is web links for block in front page'),
+    'cache' => DRUPAL_NO_CACHE,
+  ); 
+  
+  return $info;
 }
 
-function internet_devels_preprocess_page(&$vars) {
 
-  //if (isset($vars['node']->title) {
-  //  $vars['node']->title = '';
-  //}
- $vars['breadcrumb'] = '';
+/**
+ * Implementation of hook_block_view().
+ */
+function internet_devels_block_view($delta = '') {
+  $block = array();
+
+  switch ($delta) {
+    case 'product_reports':
+      $node              = menu_get_object();
+      $block['content']  = comment_node_page_additions($node);
+      break;
+
+    case 'web_links':
+      $items             = array();
+      $weblinks          = array('facebook', 'youtube', 'twitter');
+      foreach ($weblinks as $link) {
+        $path            = variable_get('weblink_path_' . $link, '');
+        if ($path) {
+          $items[]       = l(drupal_ucfirst($link), $path, array('attributes' => array('class' => array($link))));
+        }
+      }
+      $block['content']  = theme('item_list', array('items' => $items));
+     break;
+  }
+  return $block;
+}
+
+/**
+ * Implementation of hook_block_configure().
+ */
+function internet_devels_block_configure($delta = '') {
+  $form = array();
+  switch ($delta) {
+    case 'web_links':
+      $weblinks = array('facebook', 'youtube', 'twitter');
+      foreach ($weblinks as $link) {
+        $form['weblink_fieldset_' . $link] = array(
+          '#type'             => 'fieldset',
+          '#title'            => t('Web link ' . $link),
+          '#collapsible'      => TRUE,
+          '#collapsed'        => TRUE
+        );
+  
+        $form['weblink_fieldset_' . $link]['weblink_path_' . $link] = array(
+          '#type'             => 'textfield',
+          '#title'            => t('Path'),
+          '#default_value'    => variable_get('weblink_path_' . $link, ''),
+          '#element_validate' => array('internet_devels_link_path')
+        );
+      }
+      break; 
+  }
+  return $form;
+}
+
+/**
+ * Implements hook_block_save().
+*/
+function internet_devels_block_save($delta = '', $edit = array()) {
+  switch ($delta) {
+    case 'web_links':
+      $weblinks  = array('facebook', 'youtube', 'twitter');
+      foreach ($weblinks as $link) {
+        variable_set('weblink_path_' . $link, $edit['weblink_path_' . $link]);
+      }
+      break;
+  }
+}
+/**
+ * Implementation Link_patch.
+ */
+function internet_devels_link_path($element, &$form_state, $form) {
+  if (!empty($element['#value']) && link_validate_url(trim($element['#value'])) != LINK_EXTERNAL) {
+    form_error($element, t('Not a valid URL. It must be external.'));
+  }
+}
+
+/**
+ * Implementation of hook_node_view().
+ */
+function internet_devels_node_view($node, $view_mode, $langcode = NULL) {
+  //drupal_set_message('<pre><strong>Stay debug:</strong><br />' . print_r($node->content['field_product_reference'] , 1) . '</pre>', 'warning');
+  switch ($view_mode) {
+    case 'full':
+    if ($node->type == 'product') {
+      if (isset($node->content['links']['comment'])) {
+        unset($node->content['links']['comment']);
+      }
+      if (isset($node->content['links']['flag']) && isset($node->content['links']['flag']['#links'])) {
+        $links = array();
+        // unset default flag links 
+        if (isset($node->content['links']['flag']['#links']['flag-wishlist_flag'])) {
+          $flag = $node->content['links']['flag']['#links']['flag-wishlist_flag'];
+          unset($node->content['links']['flag']['#links']['flag-wishlist_flag']);
+          $links[] = $flag['title'];
+        }
+        if (isset($node->content['links']['flag']['#links']['flag-compare_products'])) {
+          $flag = $node->content['links']['flag']['#links']['flag-compare_products'];
+          unset($node->content['links']['flag']['#links']['flag-compare_products']);
+          $links[] = $flag['title'];
+        }
+
+        if (isset($node->content['links']['statistics'])) {
+          unset($node->content['links']['statistics']);
+        }
+        // wishlist/compare links
+        if ($links) { 
+          $node->content['product_links'] = array(
+            '#markup' => implode(' | ', $links),
+            '#weight' => 4,
+            '#prefix' => '<div class="product-links">',
+            '#suffix' => '</div>'
+          );
+        }
+      }
+      //unsetting our comments view
+      if (isset($node->content['links']['comment'])) {
+        unset($node->content['links']['comment']);
+      }
+      // product images view
+       $node->content['product_images'] = array(
+          '#markup' => views_embed_view('products_additional_view', 'attachment_2', $node->nid),
+          '#weight' => 0,
+          '#prefix' => '<div class="product-images">',
+          '#suffix' => '</div>'
+        );
+       // add new review link
+      //if (node_access('create', 'product_review')) {
+        if (isset($product_id) && $product_id) {
+          $node->content['product_review'] = array(
+            '#type'   => 'item',
+            '#title'  => t('Product review: '),
+            '#markup' => l(t('Add product review'), 'node/add/product-review', array('query' => array('product' => $node->nid))),
+            '#prefix' => '<div class="add-review">',
+            '#suffix' => '</div>',
+            '#weight' => 0
+          );
+       //$node->content['submit'] 
+        }
+        if (isset($node->content['field_product_reference']['#formatter'])) {
+          $node->content['field_product_reference']['#formatter'] = array(
+            '#weight' => 0,
+          );
+        }
+      $node->content['product_review'] = 'group_product_info';
+      $node->content['comments'] = NULL;
+    } 
+  }
+  
+}
  
-//drupal_set_message('<pre><strong>debug:</strong><br />' . print_r($vars, 1) . '</pre>', 'warning');
+/**
+ * Implementation of compare_form().
+ */
+function internet_devels_compare_form($form, &$form_state) {
+  $form['submit'] = array(
+    '#markup' => l(t('Compare Items'), 'internet_devels_compare_items'),
+  );
+  $form['delete'] = array(
+    '#type' => 'button',
+    '#value' => t('Clear all'),
+    '#submit' => array('internet_devels_compare_delete'),
+  );
+  return $form;
+
 }
 
-function internet_devels_page() {
-  print '';
-  return ' ';
+ 
+/**
+ * Implementation of compare_form().
+ */
+function internet_devels_compare_delete($form, $form_state) {
+  global $user;
+    $nodes=db_select('node','n');
+    $nodes->join('flag_content', 'uid', 'content_id= nid');
+    $nodes->fields('n',array('nid',''));
+    $nodes->condition('n.type','page');
+    $result = $nodes->execute()->fetchAll();
+    $flag = flag_get_flag(NULL, flag_compare_products);
+    foreach ($result as $nid) {
+      $flag->flag('unflag', $nid->nid, $user);
+      $flag = flag_get_flag('flag-compare_products') or die('No products in compare'); 
+    }
+}
+/**
+ * Redirect to compare-items page
+ */
+function internet_devels_compare_items($form, &$form_state) {
+  $form_state['redirect'] = array('compare-products');
 }
